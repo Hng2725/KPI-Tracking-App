@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { usePrivosContext, useLists, usePrivosApp, usePrivosTool } from '@privos/app-react';
+import { usePrivosContext, usePrivosTool } from '@privos/app-react';
 import { Card, Avatar, Typography, DatePicker, Row, Col, Statistic, List, Space, Tag, Radio, Select, Divider, Segmented } from 'antd';
 import { UserOutlined, EyeOutlined, LikeOutlined, CommentOutlined, LinkOutlined, CrownOutlined, ThunderboltOutlined, FacebookOutlined, TwitterOutlined, LinkedinOutlined } from '@ant-design/icons';
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -41,7 +41,6 @@ const MOCK_ACCOUNTS = [
 export default function SocialTrackerApp() {
   const ctx = usePrivosContext();
 
-  const { app } = usePrivosApp();
   const [crawledPosts, setCrawledPosts] = React.useState<any[]>([]);
 
   // 1. Dùng trực tiếp hook usePrivosTool do nền tảng khuyến nghị để an toàn hơn thay vì tự gọi callServerTool
