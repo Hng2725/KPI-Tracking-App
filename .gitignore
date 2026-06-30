@@ -27,3 +27,9 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Temp scripts
+test-*.ts
+background_crawl_job.ts
+push_to_lists.ts
+crawled_data.json

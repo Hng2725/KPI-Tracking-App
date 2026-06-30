@@ -1,0 +1,33 @@
+name: Daily KPI Crawler
+
+on:
+  schedule:
+    # Chạy vào lúc 00:00 UTC (khoảng 07:00 sáng giờ Việt Nam) hàng ngày.
+    # Nếu muốn chạy chính xác 00:00 giờ VN, đổi thành: '0 17 * * *' (17:00 UTC)
+    - cron: '0 17 * * *' 
+  workflow_dispatch: # Cho phép bấm nút chạy thủ công từ GitHub UI để test
+
+jobs:
+  crawl-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run KPI Crawl Script
+        env:
+          PRIVOS_URL: ${{ secrets.PRIVOS_URL }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          API_CRAWL_KEY: ${{ secrets.API_CRAWL_KEY }}
+        run: npx tsx crawl_to_ui.ts

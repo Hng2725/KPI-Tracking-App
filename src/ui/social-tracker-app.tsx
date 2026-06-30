@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePrivosContext, usePrivosTool } from '@privos/app-react';
 import { Card, Avatar, Typography, DatePicker, Row, Col, Statistic, List, Space, Tag, Radio, Select, Divider, Segmented } from 'antd';
 import { UserOutlined, EyeOutlined, LikeOutlined, CommentOutlined, LinkOutlined, CrownOutlined, ThunderboltOutlined, FacebookOutlined, TwitterOutlined, LinkedinOutlined } from '@ant-design/icons';
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -16,64 +17,90 @@ type PlatformId = typeof PLATFORMS[number]['id'];
 
 const MOCK_ACCOUNTS = [
   {
-    id: 'alex',
-    name: 'Alex Developer',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
+    id: 'stev_builds',
+    name: 'Steve AI',
+    avatar: 'https://pbs.twimg.com/profile_images/2037485149974306816/OXRyigkg_400x400.jpg',
     platforms: {
-      facebook: { username: '@alex.dev.fb', bio: 'Sharing my dev journey on FB', followers: 12500, totalPosts: 340 },
-      x: { username: '@alex_dev_x', bio: 'Tech tweets and web rants 🚀', followers: 8900, totalPosts: 1200 },
-      linkedin: { username: 'in/alex-dev', bio: 'Senior Software Engineer | Open Source', followers: 4500, totalPosts: 150 },
+      facebook: { username: 'Steve AI', bio: '', followers: 0, totalPosts: 0 },
+      x: { username: '@stev_builds', bio: 'Building @PrivOSAI| Enterprise AI suite where teams & agents collaborate | http://travelopen.ai | Agentic Hotel ...', followers: 1500, totalPosts: 320 },
+      linkedin: { username: 'in/steve-ai', bio: 'AI Engineer', followers: 800, totalPosts: 45 },
     }
   },
   {
-    id: 'sam',
-    name: 'Sam Designer',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sam',
+    id: 'privosai',
+    name: 'PrivOS',
+    avatar: 'https://pbs.twimg.com/profile_images/2013183029779288065/GlhEZQnx_400x400.jpg',
     platforms: {
-      facebook: { username: '@sam.design.fb', bio: 'Design tips and tricks everyday', followers: 22000, totalPosts: 500 },
-      x: { username: '@sam_design_x', bio: 'Pixel perfect pixels ✨', followers: 15000, totalPosts: 800 },
-      linkedin: { username: 'in/sam-design', bio: 'Lead UI/UX Designer', followers: 8200, totalPosts: 200 },
+      facebook: { username: 'PrivOS', bio: 'Facebook page', followers: 0, totalPosts: 0 },
+      x: { username: '@PrivOSAI', bio: 'The Intuitive Virtual Workspace Where Teams & AI Agents Collaborate', followers: 29, totalPosts: 5 },
+      linkedin: { username: 'in/privos', bio: 'LinkedIn page', followers: 0, totalPosts: 0 },
     }
   }
 ];
 
-const generateFakePosts = (accountId: string, platformId: PlatformId) => {
-  const posts = [];
-  const today = dayjs();
-  for (let i = 0; i < 40; i++) {
-    const date = today.subtract(i, 'day');
-    const numPosts = Math.floor(Math.random() * 3);
-    for (let j = 0; j < numPosts; j++) {
-      const isAlex = accountId === 'alex';
-      posts.push({
-        id: `${accountId}-${platformId}-post-${i}-${j}`,
-        date: date.format('YYYY-MM-DD'),
-        views: Math.floor(Math.random() * 5000) + 1000,
-        reacts: Math.floor(Math.random() * 800) + 50,
-        comments: Math.floor(Math.random() * 100) + 5,
-        summary: isAlex 
-          ? `[${platformId.toUpperCase()}] Tech insight #${i}-${j}: Exploring new web technologies.` 
-          : `[${platformId.toUpperCase()}] Design tip #${i}-${j}: Improving user experience through micro-interactions.`,
-        link: `https://example.com/post/${accountId}/${platformId}/${i}-${j}`
-      });
-    }
-  }
-  return posts;
-};
-
-const POSTS_DB: Record<string, any[]> = {
-  'alex-facebook': generateFakePosts('alex', 'facebook'),
-  'alex-x': generateFakePosts('alex', 'x'),
-  'alex-linkedin': generateFakePosts('alex', 'linkedin'),
-  'sam-facebook': generateFakePosts('sam', 'facebook'),
-  'sam-x': generateFakePosts('sam', 'x'),
-  'sam-linkedin': generateFakePosts('sam', 'linkedin'),
-};
-
 export default function SocialTrackerApp() {
-  const [selectedAccId, setSelectedAccId] = useState<string>('alex');
+  const ctx = usePrivosContext();
+
+  const [crawledPosts, setCrawledPosts] = React.useState<any[]>([]);
+
+  // 1. Dùng trực tiếp hook usePrivosTool do nền tảng khuyến nghị để an toàn hơn thay vì tự gọi callServerTool
+  const { data: resData, loading: isLoading, error: toolErr } = usePrivosTool('privos.lists.getItems', {
+    listId: '6a423fc77a0dbb7a6b79a20f',
+    roomId: ctx.roomId,
+    count: 100
+  });
+
+  const dbStatus = React.useMemo(() => {
+    if (isLoading) return 'Fetching from privos.lists...';
+    if (toolErr) return `Error loading from lists: ${toolErr.message || String(toolErr)}`;
+    if (crawledPosts.length > 0) return `Synced ${crawledPosts.length} records directly from privos.lists!`;
+    return 'No data found in list';
+  }, [isLoading, toolErr, crawledPosts.length]);
+
+  React.useEffect(() => {
+    if (!resData) return;
+
+    let rawItems = [];
+    if (resData.items) {
+      rawItems = resData.items;
+    } else if (resData.content && resData.content[0] && resData.content[0].text) {
+      try {
+        const parsed = JSON.parse(resData.content[0].text);
+        if (parsed.items) rawItems = parsed.items;
+      } catch (e) { }
+    }
+
+    if (rawItems.length > 0) {
+      const mapped = rawItems.map((i: any) => {
+        const c = i.customFields || {};
+        const getVal = (key: string) => Array.isArray(c) ? c.find(f => f.fieldId === key)?.value : c[key];
+        return {
+          id: getVal('f_id'),
+          date: getVal('f_date'),
+          views: Number(getVal('f_views') || 0),
+          reacts: Number(getVal('f_reacts') || 0),
+          comments: Number(getVal('f_comments') || 0),
+          summary: i.description || '',
+          link: getVal('f_link'),
+          rawCustomFields: i.customFields
+        };
+      });
+      
+      // Deduplicate posts by ID to prevent React key collision bugs
+      const uniquePostsMap = new Map();
+      mapped.forEach((p: any) => {
+         if (p.id && !uniquePostsMap.has(p.id)) {
+            uniquePostsMap.set(p.id, p);
+         }
+      });
+      
+      setCrawledPosts(Array.from(uniquePostsMap.values()));
+    }
+  }, [resData]);
+
+  const [selectedAccId, setSelectedAccId] = useState<string>('privosai');
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformId>('x');
-  
+
   const [viewMode, setViewMode] = useState<'single' | 'range'>('range');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(35, 'day'), dayjs()]);
   const [sortBy, setSortBy] = useState<'date' | 'views' | 'reacts' | 'comments'>('date');
@@ -93,13 +120,20 @@ export default function SocialTrackerApp() {
 
   // Filter posts within date range
   const { filteredPosts, chartData, stats, topPosts, avgViews, engagementRate } = useMemo(() => {
-    const dbKey = `${selectedAccId}-${selectedPlatform}`;
-    const allPosts = POSTS_DB[dbKey] || [];
+    // Filter by selected account prefix (e.g. 'privosai-x-' or 'stev_builds-x-')
+    const prefix = `${selectedAccId}-${selectedPlatform}-`;
+    const allPosts = crawledPosts.filter(p => 
+      p.id && 
+      p.id.startsWith(prefix) &&
+      p.link && 
+      p.link.toLowerCase().includes(selectedAccId.toLowerCase()) // Loại bỏ các bài Retweet từ tài khoản khác
+    );
+
     if (!dateRange || !dateRange[0] || !dateRange[1]) return { filteredPosts: [], chartData: [], stats: { views: 0, reacts: 0, comments: 0 }, topPosts: [], avgViews: 0, engagementRate: '0.0' };
 
     const startDate = dateRange[0];
     const endDate = dateRange[1];
-    
+
     // Filter posts
     const currentPosts = allPosts.filter(p => {
       const pTime = dayjs(p.date).startOf('day').valueOf();
@@ -159,6 +193,14 @@ export default function SocialTrackerApp() {
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', background: '#f5f7fa', minHeight: '100vh', borderRadius: '8px' }}>
       <Title level={2} style={{ textAlign: 'center', marginBottom: 32, color: '#1890ff' }}>Multi-Platform KPI Tracker</Title>
 
+      {/* 👱‍♀️ ponytail: minimalist privos.lists usage proof without over-engineering */}
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <Space>
+          <Tag color="magenta">Mã Room: {ctx.roomId}</Tag>
+          <Tag color="green">Dữ liệu: {dbStatus}</Tag>
+        </Space>
+      </div>
+
       {/* Header: Platform & Account Switcher */}
       <Card style={{ marginBottom: 24, borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} bordered={false}>
         <Row gutter={[24, 24]} align="middle" justify="space-between">
@@ -205,16 +247,16 @@ export default function SocialTrackerApp() {
             </Space>
           </Col>
         </Row>
-        
+
         <Divider style={{ margin: '24px 0' }} />
-        
+
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24}>
             <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
               <Avatar size={100} src={account.avatar} style={{ border: `3px solid ${activePlatform.color}` }} />
               <div>
                 <Title level={3} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {account.name} 
+                  {account.name}
                   <span style={{ color: activePlatform.color, fontSize: 24, display: 'flex', alignItems: 'center' }}>{activePlatform.icon}</span>
                 </Title>
                 <Text type="secondary" style={{ fontSize: 18 }}>{platformData.username}</Text>
@@ -228,7 +270,7 @@ export default function SocialTrackerApp() {
           </Col>
         </Row>
       </Card>
-      
+
       {/* Filters & Summary Stats */}
       <Card style={{ marginBottom: 24, borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} bordered={false}>
         <Row gutter={[24, 24]} align="middle">
@@ -246,16 +288,16 @@ export default function SocialTrackerApp() {
                 </Radio.Group>
               </Space>
               {viewMode === 'single' ? (
-                <DatePicker 
-                  value={dateRange[0]} 
-                  onChange={(val) => val && setDateRange([val, val])} 
+                <DatePicker
+                  value={dateRange[0]}
+                  onChange={(val) => val && setDateRange([val, val])}
                   disabledDate={disabledDate}
                   style={{ width: '100%', borderRadius: 6 }}
                   allowClear={false}
                 />
               ) : (
-                <DatePicker.RangePicker 
-                  value={dateRange} 
+                <DatePicker.RangePicker
+                  value={dateRange}
                   onChange={(vals) => {
                     if (vals && vals[0] && vals[1]) {
                       let start = vals[0];
@@ -265,7 +307,7 @@ export default function SocialTrackerApp() {
                       }
                       setDateRange([start, end]);
                     }
-                  }} 
+                  }}
                   disabledDate={disabledDate}
                   style={{ width: '100%', borderRadius: 6 }}
                   allowClear={false}
@@ -299,7 +341,7 @@ export default function SocialTrackerApp() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <RechartsTooltip cursor={{fill: 'transparent'}} />
+                <RechartsTooltip cursor={{ fill: 'transparent' }} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {
                     [
@@ -316,16 +358,16 @@ export default function SocialTrackerApp() {
               <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1890ff" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#1890ff" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#1890ff" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#1890ff" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorReacts" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#52c41a" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#52c41a" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#52c41a" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#52c41a" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#faad14" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#faad14" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#faad14" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#faad14" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -345,9 +387,9 @@ export default function SocialTrackerApp() {
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={16}>
           {/* Post List */}
-          <Card 
-            title="Posts in selected period" 
-            style={{ borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} 
+          <Card
+            title="Posts in selected period"
+            style={{ borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
             bordered={false}
             extra={
               <Space>
@@ -400,16 +442,16 @@ export default function SocialTrackerApp() {
                   <Statistic title="Avg Views / Post" value={avgViews} prefix={<EyeOutlined />} />
                 </Col>
                 <Col span={12}>
-                  <Statistic title="Engagement Rate" value={engagementRate} suffix="%" prefix={<ThunderboltOutlined style={{color: '#faad14'}} />} />
+                  <Statistic title="Engagement Rate" value={engagementRate} suffix="%" prefix={<ThunderboltOutlined style={{ color: '#faad14' }} />} />
                 </Col>
               </Row>
             </Card>
 
             {/* Top Post Card */}
             {topPosts.length > 0 && (
-              <Card 
-                title={<Space><CrownOutlined style={{color: '#faad14'}} /> Top 3 Posts</Space>} 
-                style={{ borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', background: 'linear-gradient(145deg, #fff9e6, #fff)' }} 
+              <Card
+                title={<Space><CrownOutlined style={{ color: '#faad14' }} /> Top 3 Posts</Space>}
+                style={{ borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', background: 'linear-gradient(145deg, #fff9e6, #fff)' }}
                 bordered={false}
               >
                 {topPosts.map((post, index) => (
