@@ -85,10 +85,29 @@ export function handleMcpMessage(method: string, _id: number, params: any): any 
 							ui: { resourceUri: UI_RESOURCE_URI },
 						},
 					},
+					{
+						name: 'privos.crawler.getData',
+						title: 'Get Crawled Data',
+						description: 'Returns data crawled by background job',
+						inputSchema: { type: 'object', properties: {} }
+					}
 				],
 			};
 
 		case 'tools/call':
+			if (params?.name === 'privos.crawler.getData') {
+				let data = [];
+				try {
+					const filePath = path.join(process.cwd(), 'crawled_data.json');
+					if (fs.existsSync(filePath)) {
+						data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+					}
+				} catch (e) {}
+				return {
+					content: [{ type: 'text', text: JSON.stringify(data) }]
+				};
+			}
+
 			if (params?.name !== TOOL_NAME) {
 				throw new Error(`Unknown tool: ${params?.name || '<missing>'}`);
 			}
